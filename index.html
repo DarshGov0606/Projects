@@ -840,8 +840,9 @@
   <script>
     // === SUPABASE SETTINGS ===
     // Paste these 2 values from Supabase > Project Settings > API.
-    const SUPABASE_URL = "https://lpqsybkqxpvdpfesdhaw.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwcXN5YmtxeHB2ZHBmZXNkaGF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxNjk2MDAsImV4cCI6MjA5NTc0NTYwMH0.5tnq4LJU2hP6j5iUe5BR83C7f66EiAqXqIdghzFcmn4";
+  const SUPABASE_URL = "https://lpqsybkqxpvdpfesdhaw.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwcXN5YmtxeHB2ZHBmZXNkaGF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxNjk2MDAsImV4cCI6MjA5NTc0NTYwMH0.5tnq4LJU2hP6j5iUe5BR83C7f66EiAqXqIdghzFcmn4";
+
 
     // This is the single shared itinerary row in your database.
     const TRIP_ID = "drakensberg-sun-2026";
@@ -869,6 +870,14 @@
       root.querySelectorAll(".tile-placeholder").forEach(el => el.remove());
       root.querySelectorAll(".tile-list.drag-over").forEach(el => el.classList.remove("drag-over"));
       root.querySelectorAll(".toast").forEach(el => el.classList.remove("show"));
+
+      // Do not save JavaScript binding markers into Supabase/HTML.
+      // Event listeners do not survive a page reload, so saved markers can stop drag/edit from rebinding.
+      root.querySelectorAll("[data-autosave-bound], [data-drag-bound]").forEach(el => {
+        el.removeAttribute("data-autosave-bound");
+        el.removeAttribute("data-drag-bound");
+      });
+
       return root;
     }
 
@@ -880,8 +889,10 @@
 
     function bindAutoSave() {
       document.querySelectorAll('[contenteditable="true"]').forEach(el => {
-        if (el.dataset.autosaveBound === "1") return;
-        el.dataset.autosaveBound = "1";
+        // Use a JS-only property, not a data attribute, because data attributes get saved into the HTML.
+        if (el.__autosaveBound) return;
+        el.__autosaveBound = true;
+        el.removeAttribute("data-autosave-bound");
         el.addEventListener("input", () => {
           saveCurrentState();
         });
@@ -1036,8 +1047,11 @@
           tile.prepend(handle);
         }
 
-        if (handle.dataset.dragBound === "1") return;
-        handle.dataset.dragBound = "1";
+        // Use a JS-only property, not data-drag-bound. Saved data attributes caused handles
+        // to look bound after reloading from Supabase, even though their event listeners were gone.
+        if (handle.__dragBound) return;
+        handle.__dragBound = true;
+        handle.removeAttribute("data-drag-bound");
         handle.addEventListener("pointerdown", event => startTileDrag(event, tile));
       });
     }
