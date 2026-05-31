@@ -1,1234 +1,400 @@
 <!DOCTYPE html>
-<html lang="en"><head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Drakensberg Sun Trip Planner</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
-      --bg: #f5f1e8;
-      --card: #fffdf8;
+      --bg: #102116;
+      --card: rgba(255, 253, 248, 0.88);
+      --card-solid: #fffdf8;
       --ink: #263128;
-      --muted: #6f786f;
+      --muted: #68766d;
       --green: #2f6f4e;
-      --green-dark: #1f4d36;
+      --green-dark: #173625;
       --sand: #eadfcb;
       --amber: #d9913d;
       --blue: #4f86a8;
       --red: #b85c4a;
-      --shadow: 0 14px 35px rgba(38, 49, 40, 0.12);
-      --radius: 22px;
+      --purple: #8e6db2;
+      --shadow: 0 18px 46px rgba(8, 20, 13, 0.24);
+      --radius: 24px;
+      --glass-border: rgba(255,255,255,0.48);
+      --hero-image: url("https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1800&q=80");
     }
 
-    * {
-      box-sizing: border-box;
-    }
-
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     body {
       margin: 0;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(circle at top left, rgba(79, 134, 168, 0.2), transparent 28rem),
-        radial-gradient(circle at bottom right, rgba(47, 111, 78, 0.18), transparent 30rem),
+        linear-gradient(180deg, rgba(7, 19, 12, 0.52), rgba(245, 241, 232, 0.88) 44%, #f5f1e8 100%),
+        var(--hero-image) center top / cover fixed,
         var(--bg);
       min-height: 100vh;
     }
 
-    header {
-      padding: 38px clamp(18px, 4vw, 56px) 20px;
+    body:not(.edit-mode) .edit-only { display: none !important; }
+    body:not(.edit-mode) [contenteditable="true"] { cursor: default; }
+    body.edit-mode [contenteditable="true"] { cursor: text; }
+
+    .site-shell { min-height: 100vh; }
+    header { padding: 28px clamp(14px, 4vw, 56px) 12px; }
+    main { max-width: 1360px; margin: 0 auto; padding: 10px clamp(14px, 4vw, 56px) 70px; }
+
+    .top-nav {
+      max-width: 1360px;
+      margin: 0 auto 16px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: white;
     }
+    .quick-jumps { display: flex; flex-wrap: wrap; gap: 8px; }
+    .quick-jumps a, .status-pill {
+      text-decoration: none;
+      color: white;
+      background: rgba(0,0,0,0.24);
+      border: 1px solid rgba(255,255,255,0.22);
+      backdrop-filter: blur(10px);
+      padding: 8px 11px;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 0.86rem;
+    }
+    .status-pill { color: #f7ffe9; }
 
     .hero {
       display: grid;
-      grid-template-columns: 1.5fr 0.8fr;
-      gap: 24px;
+      grid-template-columns: 1.45fr 0.8fr;
+      gap: 22px;
       align-items: stretch;
-      max-width: 1320px;
+      max-width: 1360px;
       margin: 0 auto;
     }
-
-    .hero-card,
-    .controls-card {
-      background: rgba(255, 253, 248, 0.88);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.7);
+    .hero-card, .controls-card, .panel-card, .day-column, .notes-panel {
+      background: var(--card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
     }
-
-    .hero-card {
-      padding: clamp(24px, 4vw, 44px);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .hero-card::after {
+    .hero-card { padding: clamp(24px, 4vw, 46px); overflow: hidden; position: relative; }
+    .hero-card:before {
       content: "";
       position: absolute;
-      inset: auto -30px -70px auto;
-      width: 320px;
-      height: 180px;
-      background: linear-gradient(145deg, rgba(47, 111, 78, 0.2), rgba(79, 134, 168, 0.18));
-      border-radius: 60% 40% 0 0;
-      transform: rotate(-8deg);
+      inset: 0;
+      background: radial-gradient(circle at top right, rgba(47,111,78,0.22), transparent 34rem);
+      pointer-events: none;
     }
+    .hero-card > * { position: relative; z-index: 1; }
 
     .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      border-radius: 99px;
-      background: #ecf3ed;
-      color: var(--green-dark);
-      font-weight: 700;
-      font-size: 0.85rem;
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 12px; border-radius: 99px;
+      background: rgba(236, 243, 237, 0.9); color: var(--green-dark);
+      font-weight: 900; font-size: 0.85rem; letter-spacing: 0.03em; text-transform: uppercase;
     }
+    h1 { margin: 18px 0 10px; font-size: clamp(2.1rem, 5vw, 4.4rem); line-height: 0.92; letter-spacing: -0.065em; }
+    .subtitle { max-width: 780px; color: var(--muted); font-size: clamp(1rem, 1.8vw, 1.18rem); line-height: 1.62; margin: 0; }
+    .trip-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+    .pill { padding: 10px 14px; border-radius: 15px; background: rgba(234,223,203,0.82); font-weight: 800; color: #4c4438; }
 
-    h1 {
-      margin: 18px 0 10px;
-      font-size: clamp(2rem, 5vw, 4.2rem);
-      line-height: 0.95;
-      letter-spacing: -0.06em;
+    .controls-card { padding: 20px; display: flex; flex-direction: column; justify-content: space-between; gap: 18px; }
+    .controls-card h2 { margin: 0; font-size: 1.24rem; }
+    .controls-card p { margin: 8px 0 0; color: var(--muted); line-height: 1.45; }
+    .button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+    button, .open-link {
+      border: 0; border-radius: 16px; padding: 12px 13px; font: inherit; font-weight: 900;
+      cursor: pointer; transition: transform .16s ease, box-shadow .16s ease, background .16s ease; text-decoration: none; text-align: center;
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
     }
+    button:hover, .open-link:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(38,49,40,0.16); }
+    .primary { background: var(--green); color: white; }
+    .secondary { background: #e8ece6; color: var(--green-dark); }
+    .danger { background: #f2dfda; color: #843629; }
+    .ghost { background: rgba(255,255,255,0.55); color: var(--green-dark); border: 1px solid #dde5dc; }
+    .mini { padding: 7px 9px; border-radius: 11px; font-size: .78rem; background: #f4efe8; color: #5c554d; }
 
-    .subtitle {
-      max-width: 740px;
-      color: var(--muted);
-      font-size: clamp(1rem, 1.8vw, 1.18rem);
-      line-height: 1.6;
-      margin: 0;
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin: 20px 0; }
+    .toolbar h2 { margin: 0; font-size: clamp(1.5rem, 2.2vw, 2rem); letter-spacing: -0.035em; color: #14251a; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; font-size: .88rem; color: #405149; font-weight: 800; background: rgba(255,255,255,.52); padding: 6px 9px; border-radius: 999px; }
+    .dot { width: 11px; height: 11px; border-radius: 99px; display: inline-block; }
+    .dot.stay { background: var(--green); } .dot.food { background: var(--amber); } .dot.activity { background: var(--blue); } .dot.hike { background: var(--purple); } .dot.chill { background: var(--red); }
+
+    .calendar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .day-column { overflow: hidden; min-height: 620px; display: flex; flex-direction: column; }
+    .day-head { padding: 20px; background: linear-gradient(135deg, rgba(255,250,240,.92), rgba(238,245,238,.9)); border-bottom: 1px solid #ece3d3; }
+    .day-head h3 { margin: 0; font-size: 1.26rem; }
+    .day-head p { margin: 6px 0 0; color: var(--muted); font-weight: 800; }
+    .tile-list { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+
+    .tile, .option, .link-card, .decision-item {
+      background: var(--card-solid); border: 1px solid #eee4d6; border-radius: 18px; box-shadow: 0 8px 18px rgba(38,49,40,.08); position: relative;
     }
-
-    .trip-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 24px;
-      position: relative;
-      z-index: 2;
-    }
-
-    .pill {
-      padding: 10px 14px;
-      border-radius: 14px;
-      background: var(--sand);
-      font-weight: 700;
-      color: #4c4438;
-    }
-
-    .controls-card {
-      padding: 22px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 18px;
-    }
-
-    .controls-card h2 {
-      margin: 0;
-      font-size: 1.25rem;
-    }
-
-    .controls-card p {
-      margin: 8px 0 0;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
-    .button-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    button {
-      border: 0;
-      border-radius: 16px;
-      padding: 13px 15px;
-      font: inherit;
-      font-weight: 800;
-      cursor: pointer;
-      transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
-    }
-
-    button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 22px rgba(38, 49, 40, 0.16);
-    }
-
-    .primary {
-      background: var(--green);
-      color: white;
-    }
-
-    .secondary {
-      background: #e8ece6;
-      color: var(--green-dark);
-    }
-
-    .danger {
-      background: #f2dfda;
-      color: #843629;
-    }
-
-    main {
-      max-width: 1320px;
-      margin: 0 auto;
-      padding: 16px clamp(18px, 4vw, 56px) 60px;
-    }
-
-    .toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      margin: 18px 0 20px;
-    }
-
-    .toolbar h2 {
-      margin: 0;
-      font-size: clamp(1.4rem, 2vw, 2rem);
-      letter-spacing: -0.03em;
-    }
-
-    .legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .legend span {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.88rem;
-      color: var(--muted);
-      font-weight: 700;
-    }
-
-    .dot {
-      width: 11px;
-      height: 11px;
-      border-radius: 99px;
-      display: inline-block;
-    }
-
-    .dot.stay { background: var(--green); }
-    .dot.food { background: var(--amber); }
-    .dot.activity { background: var(--blue); }
-    .dot.hike { background: #8e6db2; }
-    .dot.chill { background: var(--red); }
-
-    .calendar {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 18px;
-    }
-
-    .day-column {
-      background: rgba(255, 253, 248, 0.72);
-      border: 1px solid rgba(255, 255, 255, 0.8);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      overflow: hidden;
-      min-height: 620px;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .day-head {
-      padding: 20px;
-      background: linear-gradient(135deg, #fffaf0, #eef5ee);
-      border-bottom: 1px solid #ece3d3;
-    }
-
-    .day-head h3 {
-      margin: 0;
-      font-size: 1.28rem;
-    }
-
-    .day-head p {
-      margin: 6px 0 0;
-      color: var(--muted);
-      font-weight: 700;
-    }
-
-    .tile-list {
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      flex: 1;
-    }
-
-    .tile {
-      background: var(--card);
-      border: 1px solid #eee4d6;
-      border-left: 7px solid var(--green);
-      border-radius: 18px;
-      padding: 14px;
-      box-shadow: 0 8px 18px rgba(38, 49, 40, 0.08);
-      position: relative;
-      touch-action: auto;
-    }
-
-    .drag-handle {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      width: 34px;
-      height: 34px;
-      border-radius: 12px;
-      padding: 0;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: #f1eadf;
-      color: #6d6254;
-      box-shadow: none;
-      cursor: grab;
-      user-select: none;
-      touch-action: none;
-      z-index: 3;
-      font-size: 1.1rem;
-      line-height: 1;
-    }
-
-    .drag-handle:active {
-      cursor: grabbing;
-    }
-
-    .tile.dragging {
-      opacity: 0.96;
-      transform: rotate(1deg) scale(1.02);
-      box-shadow: 0 22px 46px rgba(38, 49, 40, 0.26);
-      z-index: 999;
-      pointer-events: none;
-    }
-
-    .tile-placeholder {
-      min-height: 96px;
-      border: 2px dashed rgba(47, 111, 78, 0.38);
-      background: rgba(47, 111, 78, 0.06);
-      border-radius: 18px;
-    }
-
-    .tile-list.drag-over {
-      background: rgba(47, 111, 78, 0.045);
-      border-radius: 18px;
-    }
-
-    .tile[data-type="food"] { border-left-color: var(--amber); }
-    .tile[data-type="activity"] { border-left-color: var(--blue); }
-    .tile[data-type="hike"] { border-left-color: #8e6db2; }
-    .tile[data-type="chill"] { border-left-color: var(--red); }
-    .tile[data-type="stay"] { border-left-color: var(--green); }
-
-    .tile-top {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      align-items: start;
-      margin-bottom: 10px;
-      padding-right: 38px;
-    }
-
-    .time {
-      display: inline-flex;
-      padding: 6px 9px;
-      border-radius: 10px;
-      background: #f1eadf;
-      font-size: 0.85rem;
-      font-weight: 900;
-      color: #594d3e;
-      min-width: 78px;
-    }
-
-    .type {
-      text-transform: uppercase;
-      font-size: 0.72rem;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-      font-weight: 900;
-      padding-top: 7px;
-    }
-
-    .type-select {
-      appearance: none;
-      -webkit-appearance: none;
-      border: 1px solid #e5d9c8;
-      border-radius: 12px;
-      background-color: #fffaf1;
-      color: var(--muted);
-      font: inherit;
-      font-size: 0.72rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      font-weight: 900;
-      padding: 8px 30px 8px 10px;
-      cursor: pointer;
-      min-height: 34px;
+    .tile { border-left: 7px solid var(--green); padding: 14px; }
+    .tile[data-type="food"] { border-left-color: var(--amber); } .tile[data-type="activity"] { border-left-color: var(--blue); } .tile[data-type="hike"] { border-left-color: var(--purple); } .tile[data-type="chill"] { border-left-color: var(--red); } .tile[data-type="stay"] { border-left-color: var(--green); }
+    .tile-top { display: flex; justify-content: space-between; gap: 10px; align-items: start; margin-bottom: 10px; padding-right: 38px; }
+    .time { display: inline-flex; padding: 6px 9px; border-radius: 10px; background: #f1eadf; font-size: .85rem; font-weight: 950; color: #594d3e; min-width: 78px; }
+    .type-select, .status-select {
+      appearance: none; -webkit-appearance: none; border: 1px solid #e5d9c8; border-radius: 12px; background-color: #fffaf1; color: var(--muted);
+      font: inherit; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 950; padding: 8px 30px 8px 10px; cursor: pointer; min-height: 34px;
       background-image: linear-gradient(45deg, transparent 50%, #6f786f 50%), linear-gradient(135deg, #6f786f 50%, transparent 50%);
-      background-position: calc(100% - 16px) 14px, calc(100% - 11px) 14px;
-      background-size: 5px 5px, 5px 5px;
-      background-repeat: no-repeat;
+      background-position: calc(100% - 16px) 14px, calc(100% - 11px) 14px; background-size: 5px 5px; background-repeat: no-repeat;
     }
+    .tile-title { font-weight: 950; font-size: 1.05rem; margin-bottom: 7px; line-height: 1.3; }
+    .tile-notes { color: var(--muted); line-height: 1.45; font-size: .94rem; }
+    .status-row { margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .badge { border-radius: 999px; padding: 5px 8px; font-weight: 900; font-size: .73rem; background: #ecf3ed; color: var(--green-dark); }
 
-    .type-select:focus {
-      outline: 2px solid rgba(47, 111, 78, 0.35);
-      background-color: #f8fbf6;
-    }
+    .drag-handle { position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; border-radius: 12px; padding: 0; background: #f1eadf; color: #6d6254; box-shadow: none; cursor: grab; user-select: none; touch-action: none; z-index: 3; }
+    .drag-handle:active { cursor: grabbing; }
+    .tile.dragging { opacity: .96; transform: rotate(1deg) scale(1.02); box-shadow: 0 22px 46px rgba(38,49,40,.26); z-index: 9999; pointer-events: none; }
+    .tile-placeholder { min-height: 96px; border: 2px dashed rgba(47,111,78,.38); background: rgba(47,111,78,.06); border-radius: 18px; }
+    .tile-list.drag-over { background: rgba(47,111,78,.045); border-radius: 18px; }
 
-    .tile-title {
-      font-weight: 900;
-      font-size: 1.05rem;
-      margin-bottom: 7px;
-      line-height: 1.3;
-    }
+    [contenteditable="true"] { outline: 2px solid transparent; border-radius: 8px; transition: outline .16s ease, background .16s ease; }
+    body.edit-mode [contenteditable="true"]:hover { background: rgba(47,111,78,.055); }
+    [contenteditable="true"]:focus { outline: 2px solid rgba(47,111,78,.35); background: #f8fbf6; }
+    .edit-icon { opacity: .52; font-size: .82em; margin-left: 6px; }
+    body:not(.edit-mode) .edit-icon { display: none; }
+    .tile-actions, .card-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
 
-    .tile-notes {
-      color: var(--muted);
-      line-height: 1.45;
-      font-size: 0.94rem;
-    }
+    .panel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 24px; }
+    .panel-card { padding: 20px; }
+    .panel-title-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 12px; }
+    .panel-card h3, .notes-panel h3 { margin: 0; font-size: 1.18rem; }
+    .option-grid { display: grid; gap: 10px; }
+    .option, .link-card, .decision-item { padding: 13px; }
+    .option strong, .link-card strong { display: block; margin-bottom: 4px; }
+    .option span, .link-card span { color: var(--muted); line-height: 1.4; font-size: .92rem; display: block; }
+    .link-url { color: #457294; font-size: .82rem; word-break: break-all; margin-top: 6px; }
+    .open-link { margin-top: 10px; padding: 8px 10px; border-radius: 12px; background: #eef5ee; color: var(--green-dark); font-size: .84rem; }
 
-    [contenteditable="true"] {
-      outline: 2px solid transparent;
-      border-radius: 8px;
-      transition: outline 0.16s ease, background 0.16s ease;
-    }
+    .wide-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 24px; }
+    .notes-panel { padding: 20px; }
+    .big-notes { min-height: 110px; padding: 14px; border-radius: 16px; background: #fffaf1; border: 1px dashed #d8c8af; line-height: 1.5; }
+    .checklist { display: grid; gap: 8px; margin-top: 12px; }
+    .check-item { display: flex; gap: 10px; align-items: center; background: #fffaf1; padding: 10px; border-radius: 14px; border: 1px solid #eee1ce; }
+    .check-item input { width: 18px; height: 18px; }
+    .check-item span { flex: 1; }
 
-    [contenteditable="true"]:focus {
-      outline: 2px solid rgba(47, 111, 78, 0.35);
-      background: #f8fbf6;
-    }
+    .background-editor { margin-top: 12px; padding: 12px; border-radius: 16px; background: rgba(255,255,255,.46); border: 1px solid rgba(255,255,255,.52); }
+    .background-editor label { display: block; font-weight: 900; margin-bottom: 7px; color: var(--green-dark); }
+    .background-editor input { width: 100%; border: 1px solid #d9dfd5; border-radius: 12px; padding: 10px; font: inherit; }
 
-    .tile-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      margin-top: 10px;
-    }
-
-    .mini {
-      padding: 7px 9px;
-      border-radius: 10px;
-      font-size: 0.78rem;
-      background: #f4efe8;
-      color: #5c554d;
-    }
-
-    .sections {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 18px;
-      margin-top: 24px;
-    }
-
-    .info-card {
-      background: rgba(255, 253, 248, 0.82);
-      border: 1px solid rgba(255, 255, 255, 0.82);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 20px;
-    }
-
-    .info-card h3 {
-      margin: 0 0 12px;
-      font-size: 1.18rem;
-    }
-
-    .option-grid {
-      display: grid;
-      gap: 10px;
-    }
-
-    .option {
-      padding: 13px;
-      border-radius: 16px;
-      background: #fffaf1;
-      border: 1px solid #eee1ce;
-    }
-
-    .option strong {
-      display: block;
-      margin-bottom: 4px;
-    }
-
-    .option span {
-      color: var(--muted);
-      line-height: 1.4;
-      font-size: 0.92rem;
-    }
-
-    .notes-panel {
-      margin-top: 24px;
-      background: rgba(255, 253, 248, 0.84);
-      border: 1px solid rgba(255, 255, 255, 0.82);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 20px;
-    }
-
-    .notes-panel h3 {
-      margin: 0 0 10px;
-    }
-
-    .big-notes {
-      min-height: 110px;
-      padding: 14px;
-      border-radius: 16px;
-      background: #fffaf1;
-      border: 1px dashed #d8c8af;
-      line-height: 1.5;
-    }
-
-    .toast {
-      position: fixed;
-      right: 22px;
-      bottom: 22px;
-      background: var(--green-dark);
-      color: white;
-      padding: 13px 16px;
-      border-radius: 14px;
-      box-shadow: var(--shadow);
-      opacity: 0;
-      pointer-events: none;
-      transform: translateY(14px);
-      transition: opacity 0.2s ease, transform 0.2s ease;
-      z-index: 10;
-      font-weight: 800;
-    }
-
-    .toast.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    .toast { position: fixed; right: 22px; bottom: 22px; background: var(--green-dark); color: white; padding: 13px 16px; border-radius: 14px; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transform: translateY(14px); transition: opacity .2s ease, transform .2s ease; z-index: 10000; font-weight: 900; }
+    .toast.show { opacity: 1; transform: translateY(0); }
 
     @media (max-width: 980px) {
-      header {
-        padding: 18px 12px 10px;
-      }
-
-      main {
-        padding: 10px 12px 34px;
-      }
-
-      .hero,
-      .calendar,
-      .sections {
-        grid-template-columns: 1fr;
-      }
-
-      .hero-card,
-      .controls-card,
-      .day-column,
-      .info-card,
-      .notes-panel {
-        border-radius: 18px;
-      }
-
-      .day-column {
-        min-height: auto;
-      }
-
-      .button-row {
-        grid-template-columns: 1fr;
-      }
-
-      .tile-list {
-        padding: 12px;
-      }
-
-      .tile {
-        padding: 13px;
-      }
-
-      .drag-handle {
-        width: 40px;
-        height: 40px;
-        border-radius: 14px;
-      }
-
-      .tile-top {
-        padding-right: 44px;
-      }
-
-      .tile-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .mini {
-        min-height: 38px;
-      }
+      header { padding: 14px 12px 8px; }
+      main { padding: 10px 12px 36px; }
+      .hero, .calendar, .panel-grid, .wide-panels { grid-template-columns: 1fr; }
+      .day-column { min-height: auto; }
+      .button-row { grid-template-columns: 1fr; }
+      .quick-jumps { position: sticky; top: 8px; z-index: 50; padding: 6px; background: rgba(7,19,12,.18); border-radius: 999px; backdrop-filter: blur(12px); }
+      .tile-actions, .card-actions { display: grid; grid-template-columns: 1fr 1fr; }
+      .mini { min-height: 38px; }
     }
-
-    @media (max-width: 520px) {
-      h1 {
-        font-size: 2.1rem;
-      }
-
-      .trip-meta {
-        display: grid;
-      }
-
-      .toolbar {
-        align-items: flex-start;
-      }
-
-      .legend {
-        gap: 10px 12px;
-      }
-
-      .tile-top {
-        flex-direction: column;
-      }
-
-      .type,
-      .type-select {
-        padding-top: 0;
-      }
-
-      .type-select {
-        width: fit-content;
-        min-height: 38px;
-      }
+    @media (max-width: 540px) {
+      h1 { font-size: 2.15rem; }
+      .trip-meta { display: grid; }
+      .tile-top { flex-direction: column; }
+      .type-select, .status-select { width: fit-content; min-height: 38px; }
     }
-
     @media print {
-      body {
-        background: white;
-      }
-
-      .controls-card,
-      .toolbar .button-row,
-      .tile-actions,
-      .toast {
-        display: none !important;
-      }
-
-      .hero,
-      .calendar,
-      .sections {
-        display: block;
-      }
-
-      .day-column,
-      .info-card,
-      .hero-card,
-      .notes-panel {
-        box-shadow: none;
-        break-inside: avoid;
-        margin-bottom: 14px;
-      }
+      body { background: white; }
+      .controls-card, .quick-jumps, .edit-only, .tile-actions, .card-actions, .toast, .background-editor { display: none !important; }
+      .hero, .calendar, .panel-grid, .wide-panels { display: block; }
+      .day-column, .panel-card, .hero-card, .notes-panel { box-shadow: none; break-inside: avoid; margin-bottom: 14px; }
     }
   </style>
 </head>
 <body>
+<div class="site-shell" id="appContent" data-app-version="2">
   <header>
+    <nav class="top-nav">
+      <div class="quick-jumps">
+        <a href="#calendar">Calendar</a><a href="#meals">Meals</a><a href="#activities">Activities</a><a href="#hikes">Hikes</a><a href="#links">Links</a><a href="#notes">Notes</a>
+      </div>
+      <div class="status-pill" id="saveStatus">Not loaded yet</div>
+    </nav>
+
     <section class="hero">
       <div class="hero-card">
-        <div class="eyebrow" contenteditable="true">🏔️ Drakensberg Sun Trip</div>
-        <h1 contenteditable="true">Weekend Itinerary Planner</h1>
-        <p class="subtitle" contenteditable="true">Use this as the editable plan for the Drakensberg Sun Resort trip. Click any tile text to edit the time, title, notes, meal options, activities or hike choices. Finalise the plan, then use Save HTML to download your edited version.</p>
+        <div class="eyebrow" contenteditable="true">🏔️ Drakensberg Sun Trip <span class="edit-icon">✏️</span></div>
+        <h1 contenteditable="true">Weekend Itinerary Planner <span class="edit-icon">✏️</span></h1>
+        <p class="subtitle" contenteditable="true">Use this as the shared editable plan for the Drakensberg Sun Resort trip. Turn on Edit Mode to change text, rearrange tiles, add options, and save the shared version for everyone.</p>
         <div class="trip-meta">
-          <div class="pill" contenteditable="true">Stay: Drakensberg Sun Resort</div>
-          <div class="pill" contenteditable="true">Check-in: Saturday, 6 June · 14:00</div>
-          <div class="pill" contenteditable="true">Check-out: Monday, 8 June · 10:00</div>
+          <div class="pill" contenteditable="true">Stay: Drakensberg Sun Resort <span class="edit-icon">✏️</span></div>
+          <div class="pill" contenteditable="true">Check-in: Saturday, 6 June · 14:00 <span class="edit-icon">✏️</span></div>
+          <div class="pill" contenteditable="true">Check-out: Monday, 8 June · 10:00 <span class="edit-icon">✏️</span></div>
+        </div>
+        <div class="background-editor edit-only">
+          <label for="bgUrl">Background image URL</label>
+          <input id="bgUrl" value="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1800&q=80" oninput="updateBackground(this.value)" />
         </div>
       </div>
 
       <aside class="controls-card">
         <div>
-          <h2>Finalise the itinerary</h2>
-          <p>Edit the tiles directly. Drag tiles using the grip handle to rearrange your itinerary within a day or move items between days. Use duplicate to create alternatives, remove anything you do not want, and save the finished version as a standalone HTML file.</p>
+          <h2>Shared trip dashboard</h2>
+          <p>Use Edit Mode for planning, then save the shared version. Itinerary changes are stored in Supabase so everyone with the link sees the same plan.</p>
         </div>
         <div class="button-row">
-          <button class="primary" onclick="manualSharedSave()">Save Shared</button>
-          <button class="secondary" onclick="window.print()">Print / PDF</button>
-          <button class="secondary" onclick="addBlankTile()">Add Tile</button>
-          <button class="danger" onclick="resetStarterPlan()">Reset</button>
+          <button class="primary" onclick="saveShared()">💾 Save Shared</button>
+          <button class="secondary" onclick="loadShared(true)">🔄 Load Shared</button>
+          <button class="ghost" onclick="toggleEditMode()">✏️ Edit Mode</button>
+          <button class="secondary" onclick="window.print()">🖨️ Print / PDF</button>
+          <button class="secondary edit-only" onclick="addBlankTile()">＋ Add Tile</button>
+          <button class="danger edit-only" onclick="exportHtml()">⬇️ Export HTML</button>
         </div>
       </aside>
     </section>
   </header>
 
   <main>
-    <section class="toolbar">
+    <section class="toolbar" id="calendar">
       <h2>Calendar-style itinerary</h2>
-      <div class="legend">
-        <span><i class="dot stay"></i>Stay</span>
-        <span><i class="dot food"></i>Food</span>
-        <span><i class="dot activity"></i>Activity</span>
-        <span><i class="dot hike"></i>Hike</span>
-        <span><i class="dot chill"></i>Chill</span>
-      </div>
+      <div class="legend"><span><i class="dot stay"></i>Stay</span><span><i class="dot food"></i>Food</span><span><i class="dot activity"></i>Activity</span><span><i class="dot hike"></i>Hike</span><span><i class="dot chill"></i>Chill</span></div>
     </section>
 
-    <section class="calendar" id="calendar">
-      <article class="day-column" data-day="Saturday">
-        <div class="day-head">
-          <h3 contenteditable="true">Saturday · 6 June</h3>
-          <p contenteditable="true">Arrival, resort exploring, braai and games</p>
-        </div>
-        <div class="tile-list">
-          <div class="tile" data-type="food" style=""><button class="drag-handle" type="button" title="Drag to rearrange" aria-label="Drag to rearrange tile">⋮⋮</button>
-        <div class="tile-top"><div class="time" contenteditable="true">12:30 - 13:30</div><select class="type-select" aria-label="Activity type" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food" selected="selected">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div>
-        <div class="tile-title" contenteditable="true">Lunch Stop</div>
-        <div class="tile-notes" contenteditable="true">Thokosiza</div>
-        <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
-      </div><div class="tile" data-type="stay"><button class="drag-handle" type="button" title="Drag to rearrange" aria-label="Drag to rearrange tile">⋮⋮</button>
-            <div class="tile-top"><div class="time" contenteditable="true">14:00 - 15:30</div><select class="type-select" aria-label="Activity type" onchange="updateTileType(this)"><option value="stay" selected="selected">Stay</option><option value="food">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div>
-            <div class="tile-title" contenteditable="true">Check in and unpack</div>
-            <div class="tile-notes" contenteditable="true">Settle into the chalet/apartment, confirm rooms, unpack food and drinks.</div>
-            <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
-          </div>
-          <div class="tile" data-type="activity"><button class="drag-handle" type="button" title="Drag to rearrange" aria-label="Drag to rearrange tile">⋮⋮</button>
-            <div class="tile-top"><div class="time" contenteditable="true">15:30 – 17:00</div><select class="type-select" aria-label="Activity type" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food">Food</option><option value="activity" selected="selected">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div>
-            <div class="tile-title" contenteditable="true">Explore resort grounds</div>
-            <div class="tile-notes" contenteditable="true">Walk around the lake, scout the activity areas, check the pools and games room. Prioritize Mini Golf as activity in this time slot.</div>
-            <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
-          </div>
-          
-          <div class="tile" data-type="food"><button class="drag-handle" type="button" title="Drag to rearrange" aria-label="Drag to rearrange tile">⋮⋮</button>
-            <div class="tile-top"><div class="time" contenteditable="true">17:00 – 19:30</div><select class="type-select" aria-label="Activity type" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food" selected="selected">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div>
-            <div class="tile-title" contenteditable="true">Braai night</div>
-            <div class="tile-notes" contenteditable="true">Chalet/apartment braai. Bring meat, sides, charcoal, firelighters, snacks and drinks. Board games during braai.</div>
-            <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
-          </div>
-          <div class="tile" data-type="chill"><button class="drag-handle" type="button" title="Drag to rearrange" aria-label="Drag to rearrange tile">⋮⋮</button>
-            <div class="tile-top"><div class="time" contenteditable="true">19:30 - 22:00</div><select class="type-select" aria-label="Activity type" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill" selected="selected">Chill</option></select></div>
-            <div class="tile-title" contenteditable="true">Board and Card games</div>
-            <div class="tile-notes" contenteditable="true">Thunee, Monopoly Deal, 30 Seconds, Risk.</div>
-            <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
-          </div>
-        <div class="tile" data-type="chill"><button class="drag-handle" type="button" title="Drag to rearrange" aria-label="Drag to rearrange tile">⋮⋮</button>
-        <div class="tile-top"><div class="time" contenteditable="true">22:00 onwards</div><select class="type-select" aria-label="Activity type" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill" selected="selected">Chill</option></select></div>
-        <div class="tile-title" contenteditable="true">D&amp;D session</div>
-        <div class="tile-notes" contenteditable="true">Light D&amp;D session to end off the night.</div>
-        <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
+    <section class="calendar">
+      <article class="day-column" data-day="Saturday"><div class="day-head"><h3 contenteditable="true">Saturday · 6 June <span class="edit-icon">✏️</span></h3><p contenteditable="true">Arrival, resort exploring, braai and games <span class="edit-icon">✏️</span></p></div><div class="tile-list">
+        <div class="tile" data-type="food"><button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">12:30 - 13:30</div><select class="type-select" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food" selected>Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div><div class="tile-title" contenteditable="true">Lunch Stop</div><div class="tile-notes" contenteditable="true">Thokosiza</div><div class="status-row"><span class="badge">Needs decision</span><select class="status-select" onchange="updateStatus(this)"><option>Finalised</option><option selected>Needs decision</option><option>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div></div>
+        <div class="tile" data-type="stay"><button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">14:00 - 15:30</div><select class="type-select" onchange="updateTileType(this)"><option value="stay" selected>Stay</option><option value="food">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div><div class="tile-title" contenteditable="true">Check in and unpack</div><div class="tile-notes" contenteditable="true">Settle into the chalet/apartment, confirm rooms, unpack food and drinks.</div><div class="status-row"><span class="badge">Finalised</span><select class="status-select" onchange="updateStatus(this)"><option selected>Finalised</option><option>Needs decision</option><option>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div></div>
+        <div class="tile" data-type="activity"><button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">15:30 – 17:00</div><select class="type-select" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food">Food</option><option value="activity" selected>Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div><div class="tile-title" contenteditable="true">Explore resort grounds</div><div class="tile-notes" contenteditable="true">Walk around the lake, scout the activity areas, check the pools and games room. Prioritize Mini Golf as activity in this time slot.</div><div class="status-row"><span class="badge">Maybe</span><select class="status-select" onchange="updateStatus(this)"><option>Finalised</option><option>Needs decision</option><option selected>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div></div>
+        <div class="tile" data-type="food"><button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">17:00 – 19:30</div><select class="type-select" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food" selected>Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div><div class="tile-title" contenteditable="true">Braai night</div><div class="tile-notes" contenteditable="true">Chalet/apartment braai. Bring meat, sides, charcoal, firelighters, snacks and drinks. Board games during braai.</div><div class="status-row"><span class="badge">Finalised</span><select class="status-select" onchange="updateStatus(this)"><option selected>Finalised</option><option>Needs decision</option><option>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div></div>
+        <div class="tile" data-type="chill"><button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">19:30 - 22:00</div><select class="type-select" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill" selected>Chill</option></select></div><div class="tile-title" contenteditable="true">Board and Card games</div><div class="tile-notes" contenteditable="true">Thunee, Monopoly Deal, 30 Seconds, Risk.</div><div class="status-row"><span class="badge">Finalised</span><select class="status-select" onchange="updateStatus(this)"><option selected>Finalised</option><option>Needs decision</option><option>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div></div>
+        <div class="tile" data-type="chill"><button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">22:00 onwards</div><select class="type-select" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill" selected>Chill</option></select></div><div class="tile-title" contenteditable="true">D&amp;D session</div><div class="tile-notes" contenteditable="true">Light D&amp;D session to end off the night.</div><div class="status-row"><span class="badge">Finalised</span><select class="status-select" onchange="updateStatus(this)"><option selected>Finalised</option><option>Needs decision</option><option>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div></div>
+      </div></article>
+
+      <article class="day-column" data-day="Sunday"><div class="day-head"><h3 contenteditable="true">Sunday · 7 June <span class="edit-icon">✏️</span></h3><p contenteditable="true">Main hike, resort activities and dinner <span class="edit-icon">✏️</span></p></div><div class="tile-list">
+        <div class="tile" data-type="food"><button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">06:30–07:00</div><select class="type-select" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food" selected>Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div><div class="tile-title" contenteditable="true">Coffee and light breakfast</div><div class="tile-notes" contenteditable="true">Keep it simple before the hike: coffee, rusks, fruit, yoghurt or snack bars.</div><div class="status-row"><span class="badge">Finalised</span><select class="status-select" onchange="updateStatus(this)"><option selected>Finalised</option><option>Needs decision</option><option>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div></div>
+        <div class="tile" data-type="hike"><button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">07:00–10:00</div><select class="type-select" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food">Food</option><option value="activity">Activity</option><option value="hike" selected>Hike</option><option value="chill">Chill</option></select></div><div class="tile-title" contenteditable="true">Blue Grotto hike</div><div class="tile-notes" contenteditable="true">Recommended main hike. Moderate effort, waterfall/natural pool destination, good scenery-to-effort balance.</div><div class="status-row"><span class="badge">Needs decision</span><select class="status-select" onchange="updateStatus(this)"><option>Finalised</option><option selected>Needs decision</option><option>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div></div>
+        <div class="tile" data-type="food"><button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">10:00–12:00</div><select class="type-select" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food" selected>Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div><div class="tile-title" contenteditable="true">Breakfast / brunch</div><div class="tile-notes" contenteditable="true">Option: resort restaurant, self-catered brunch, Valley Bakery, Scrumpy Jack's or Champagne Sports Resort. Relax after Hike</div><div class="status-row"><span class="badge">Needs decision</span><select class="status-select" onchange="updateStatus(this)"><option>Finalised</option><option selected>Needs decision</option><option>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div></div>
+        <div class="tile" data-type="activity"><button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">12:00–15:00</div><select class="type-select" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food">Food</option><option value="activity" selected>Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div><div class="tile-title" contenteditable="true">Pool, lake and games block</div><div class="tile-notes" contenteditable="true">Pool, squash, games room or general resort chill. Pool and table tennis available in games room.</div><div class="status-row"><span class="badge">Maybe</span><select class="status-select" onchange="updateStatus(this)"><option>Finalised</option><option>Needs decision</option><option selected>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div></div>
+        <div class="tile" data-type="activity"><button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">15:00–17:00</div><select class="type-select" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food">Food</option><option value="activity" selected>Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div><div class="tile-title" contenteditable="true">Relax or optional outing</div><div class="tile-notes" contenteditable="true">Gaming, sightseeing, horse riding, mountain biking, lake cruise or downtime.</div><div class="status-row"><span class="badge">Maybe</span><select class="status-select" onchange="updateStatus(this)"><option>Finalised</option><option>Needs decision</option><option selected>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div></div>
+        <div class="tile" data-type="food"><button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">17:00–19:00</div><select class="type-select" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food" selected>Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div><div class="tile-title" contenteditable="true">Dinner</div><div class="tile-notes" contenteditable="true">Choose between The Terrace at Drakensberg Sun, Barnhouse, Champagne Sports Resort Bistro, Pig &amp; Plough, or self-catered dinner.</div><div class="status-row"><span class="badge">Needs decision</span><select class="status-select" onchange="updateStatus(this)"><option>Finalised</option><option selected>Needs decision</option><option>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div></div>
+        <div class="tile" data-type="chill"><button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">19:00 onwards</div><select class="type-select" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill" selected>Chill</option></select></div><div class="tile-title" contenteditable="true">Horror movies and video games</div><div class="tile-notes" contenteditable="true">Chilled final night with movies, games, snacks and drinks.</div><div class="status-row"><span class="badge">Finalised</span><select class="status-select" onchange="updateStatus(this)"><option selected>Finalised</option><option>Needs decision</option><option>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div></div>
+      </div></article>
+
+      <article class="day-column" data-day="Monday"><div class="day-head"><h3 contenteditable="true">Monday · 8 June <span class="edit-icon">✏️</span></h3><p contenteditable="true">Breakfast, packing and checkout <span class="edit-icon">✏️</span></p></div><div class="tile-list">
+        <div class="tile" data-type="food"><button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">Before 09:00</div><select class="type-select" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food" selected>Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div><div class="tile-title" contenteditable="true">Breakfast</div><div class="tile-notes" contenteditable="true">Simple self-catered breakfast or quick resort breakfast before packing.</div><div class="status-row"><span class="badge">Finalised</span><select class="status-select" onchange="updateStatus(this)"><option selected>Finalised</option><option>Needs decision</option><option>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div></div>
+        <div class="tile" data-type="stay"><button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">09:00–10:00</div><select class="type-select" onchange="updateTileType(this)"><option value="stay" selected>Stay</option><option value="food">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div><div class="tile-title" contenteditable="true">Pack and final photos</div><div class="tile-notes" contenteditable="true">Clean up, pack bags, check rooms, take final mountain/lake photos.</div><div class="status-row"><span class="badge">Finalised</span><select class="status-select" onchange="updateStatus(this)"><option selected>Finalised</option><option>Needs decision</option><option>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div></div>
+        <div class="tile" data-type="stay"><button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">10:00</div><select class="type-select" onchange="updateTileType(this)"><option value="stay" selected>Stay</option><option value="food">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div><div class="tile-title" contenteditable="true">Check out</div><div class="tile-notes" contenteditable="true">Return keys, settle any extras and head home.</div><div class="status-row"><span class="badge">Finalised</span><select class="status-select" onchange="updateStatus(this)"><option selected>Finalised</option><option>Needs decision</option><option>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div></div>
+      </div></article>
+    </section>
+
+    <section class="panel-grid">
+      <div class="panel-card" id="meals"><div class="panel-title-row"><h3 contenteditable="true">Meal locations <span class="edit-icon">✏️</span></h3><button class="mini edit-only" onclick="addOptionCard(this,'meal')">＋ Add</button></div><div class="option-grid">
+        <div class="option"><strong contenteditable="true">The Terrace at Drakensberg Sun</strong><span contenteditable="true">Resort restaurant overlooking the lake. Useful for easy dinner or breakfast.</span><div class="card-actions edit-only"><button class="mini" onclick="duplicateOption(this)">Duplicate</button><button class="mini" onclick="removeCard(this)">Remove</button></div></div>
+        <div class="option"><strong contenteditable="true">The Barnhouse Restaurant</strong><span contenteditable="true">Popular nearby local dining option.</span><div class="card-actions edit-only"><button class="mini" onclick="duplicateOption(this)">Duplicate</button><button class="mini" onclick="removeCard(this)">Remove</button></div></div>
+        <div class="option"><strong contenteditable="true">Valley Bakery</strong><span contenteditable="true">Breakfasts, pastries and light lunches.</span><div class="card-actions edit-only"><button class="mini" onclick="duplicateOption(this)">Duplicate</button><button class="mini" onclick="removeCard(this)">Remove</button></div></div>
       </div></div>
-      </article>
-
-      <article class="day-column" data-day="Sunday">
-        <div class="day-head">
-          <h3 contenteditable="true">Sunday · 7 June</h3>
-          <p contenteditable="true">Main hike, resort activities and dinner</p>
-        </div>
-        <div class="tile-list">
-          <div class="tile" data-type="food"><button class="drag-handle" type="button" title="Drag to rearrange" aria-label="Drag to rearrange tile">⋮⋮</button>
-            <div class="tile-top"><div class="time" contenteditable="true">06:30–07:00</div><select class="type-select" aria-label="Activity type" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food" selected="selected">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div>
-            <div class="tile-title" contenteditable="true">Coffee and light breakfast</div>
-            <div class="tile-notes" contenteditable="true">Keep it simple before the hike: coffee, rusks, fruit, yoghurt or snack bars.</div>
-            <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
-          </div>
-          <div class="tile" data-type="hike"><button class="drag-handle" type="button" title="Drag to rearrange" aria-label="Drag to rearrange tile">⋮⋮</button>
-            <div class="tile-top"><div class="time" contenteditable="true">07:00–10:00</div><select class="type-select" aria-label="Activity type" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food">Food</option><option value="activity">Activity</option><option value="hike" selected="selected">Hike</option><option value="chill">Chill</option></select></div>
-            <div class="tile-title" contenteditable="true">Blue Grotto hike</div>
-            <div class="tile-notes" contenteditable="true">Recommended main hike. Moderate effort, waterfall/natural pool destination, good scenery-to-effort balance.</div>
-            <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
-          </div>
-          <div class="tile" data-type="food"><button class="drag-handle" type="button" title="Drag to rearrange" aria-label="Drag to rearrange tile">⋮⋮</button>
-            <div class="tile-top"><div class="time" contenteditable="true">10:00–12:00</div><select class="type-select" aria-label="Activity type" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food" selected="selected">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div>
-            <div class="tile-title" contenteditable="true">Breakfast / brunch</div>
-            <div class="tile-notes" contenteditable="true">Option: resort restaurant, self-catered brunch, Valley Bakery, Scrumpy Jack's or Champagne Sports Resort. Relax after Hike</div>
-            <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
-          </div>
-          <div class="tile" data-type="activity"><button class="drag-handle" type="button" title="Drag to rearrange" aria-label="Drag to rearrange tile">⋮⋮</button>
-            <div class="tile-top"><div class="time" contenteditable="true">12:00–15:00</div><select class="type-select" aria-label="Activity type" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food">Food</option><option value="activity" selected="selected">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div>
-            <div class="tile-title" contenteditable="true">Pool, lake and games block</div>
-            <div class="tile-notes" contenteditable="true">Pool, squash, games room or general resort chill. Pool and table tennis available in games room.</div>
-            <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
-          </div>
-          <div class="tile" data-type="activity"><button class="drag-handle" type="button" title="Drag to rearrange" aria-label="Drag to rearrange tile">⋮⋮</button>
-            <div class="tile-top"><div class="time" contenteditable="true">15:00–17:00</div><select class="type-select" aria-label="Activity type" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food">Food</option><option value="activity" selected="selected">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div>
-            <div class="tile-title" contenteditable="true">Relax or optional outing</div>
-            <div class="tile-notes" contenteditable="true">Gaming, sightseeing, horse riding, mountain biking, lake cruise or downtime.</div>
-            <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
-          </div>
-          <div class="tile" data-type="food"><button class="drag-handle" type="button" title="Drag to rearrange" aria-label="Drag to rearrange tile">⋮⋮</button>
-            <div class="tile-top"><div class="time" contenteditable="true">17:00–19:00</div><select class="type-select" aria-label="Activity type" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food" selected="selected">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div>
-            <div class="tile-title" contenteditable="true">Dinner</div>
-            <div class="tile-notes" contenteditable="true">Choose between The Terrace at Drakensberg Sun, Barnhouse, Champagne Sports Resort Bistro, Pig &amp; Plough, or self-catered dinner.</div>
-            <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
-          </div>
-          <div class="tile" data-type="chill"><button class="drag-handle" type="button" title="Drag to rearrange" aria-label="Drag to rearrange tile">⋮⋮</button>
-            <div class="tile-top"><div class="time" contenteditable="true">19:00 onwards</div><select class="type-select" aria-label="Activity type" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill" selected="selected">Chill</option></select></div>
-            <div class="tile-title" contenteditable="true">Horror movies and video games</div>
-            <div class="tile-notes" contenteditable="true">Chilled final night with movies, games, snacks and drinks.</div>
-            <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
-          </div>
-        </div>
-      </article>
-
-      <article class="day-column" data-day="Monday">
-        <div class="day-head">
-          <h3 contenteditable="true">Monday · 8 June</h3>
-          <p contenteditable="true">Breakfast, packing and checkout</p>
-        </div>
-        <div class="tile-list">
-          <div class="tile" data-type="food"><button class="drag-handle" type="button" title="Drag to rearrange" aria-label="Drag to rearrange tile">⋮⋮</button>
-            <div class="tile-top"><div class="time" contenteditable="true">Before 09:00</div><select class="type-select" aria-label="Activity type" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food" selected="selected">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div>
-            <div class="tile-title" contenteditable="true">Breakfast</div>
-            <div class="tile-notes" contenteditable="true">Simple self-catered breakfast or quick resort breakfast before packing.</div>
-            <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
-          </div>
-          <div class="tile" data-type="stay"><button class="drag-handle" type="button" title="Drag to rearrange" aria-label="Drag to rearrange tile">⋮⋮</button>
-            <div class="tile-top"><div class="time" contenteditable="true">09:00–10:00</div><select class="type-select" aria-label="Activity type" onchange="updateTileType(this)"><option value="stay" selected="selected">Stay</option><option value="food">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div>
-            <div class="tile-title" contenteditable="true">Pack and final photos</div>
-            <div class="tile-notes" contenteditable="true">Clean up, pack bags, check rooms, take final mountain/lake photos.</div>
-            <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
-          </div>
-          <div class="tile" data-type="stay"><button class="drag-handle" type="button" title="Drag to rearrange" aria-label="Drag to rearrange tile">⋮⋮</button>
-            <div class="tile-top"><div class="time" contenteditable="true">10:00</div><select class="type-select" aria-label="Activity type" onchange="updateTileType(this)"><option value="stay" selected="selected">Stay</option><option value="food">Food</option><option value="activity">Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div>
-            <div class="tile-title" contenteditable="true">Check out</div>
-            <div class="tile-notes" contenteditable="true">Return keys, settle any extras and head home.</div>
-            <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
-          </div>
-        </div>
-      </article>
+      <div class="panel-card" id="activities"><div class="panel-title-row"><h3 contenteditable="true">Activities shortlist <span class="edit-icon">✏️</span></h3><button class="mini edit-only" onclick="addOptionCard(this,'activity')">＋ Add</button></div><div class="option-grid">
+        <div class="option"><strong contenteditable="true">Lake activities</strong><span contenteditable="true">Canoeing, row boats, lake walk, bird watching and fishing.</span><div class="card-actions edit-only"><button class="mini" onclick="duplicateOption(this)">Duplicate</button><button class="mini" onclick="removeCard(this)">Remove</button></div></div>
+        <div class="option"><strong contenteditable="true">Sports</strong><span contenteditable="true">Squash, tennis, swimming pools and bowling green.</span><div class="card-actions edit-only"><button class="mini" onclick="duplicateOption(this)">Duplicate</button><button class="mini" onclick="removeCard(this)">Remove</button></div></div>
+        <div class="option"><strong contenteditable="true">Indoor / night options</strong><span contenteditable="true">Games room, board games, card games, D&amp;D, video games and horror movies.</span><div class="card-actions edit-only"><button class="mini" onclick="duplicateOption(this)">Duplicate</button><button class="mini" onclick="removeCard(this)">Remove</button></div></div>
+      </div></div>
+      <div class="panel-card" id="hikes"><div class="panel-title-row"><h3 contenteditable="true">Hike options <span class="edit-icon">✏️</span></h3><button class="mini edit-only" onclick="addOptionCard(this,'hike')">＋ Add</button></div><div class="option-grid">
+        <div class="option"><strong contenteditable="true">Blue Grotto</strong><span contenteditable="true">Recommended. Moderate, 2–3 hours, waterfall/natural pool destination.</span><div class="card-actions edit-only"><button class="mini" onclick="duplicateOption(this)">Duplicate</button><button class="mini" onclick="removeCard(this)">Remove</button></div></div>
+        <div class="option"><strong contenteditable="true">Fern Forest</strong><span contenteditable="true">Easy to moderate, 1–1.5 hours, shaded indigenous forest and birdlife.</span><div class="card-actions edit-only"><button class="mini" onclick="duplicateOption(this)">Duplicate</button><button class="mini" onclick="removeCard(this)">Remove</button></div></div>
+        <div class="option"><strong contenteditable="true">Lake Walk</strong><span contenteditable="true">Easy, 30–60 minutes, best if everyone wants something light.</span><div class="card-actions edit-only"><button class="mini" onclick="duplicateOption(this)">Duplicate</button><button class="mini" onclick="removeCard(this)">Remove</button></div></div>
+      </div></div>
     </section>
 
-    <section class="sections">
-      <div class="info-card">
-        <h3 contenteditable="true">Meal locations</h3>
-        <div class="option-grid">
-          <div class="option" contenteditable="true"><strong>The Terrace at Drakensberg Sun</strong><span>Resort restaurant overlooking the lake. Useful for easy dinner or breakfast.</span></div>
-          <div class="option" contenteditable="true"><strong>The Barnhouse Restaurant</strong><span>Popular nearby local dining option.</span></div>
-          <div class="option" contenteditable="true"><strong>Champagne Sports Resort Bistro</strong><span>Casual meals and drinks nearby.</span></div>
-          <div class="option" contenteditable="true"><strong>Valley Bakery</strong><span>Breakfasts, pastries and light lunches.</span></div>
-          <div class="option" contenteditable="true"><strong>Scrumpy Jack's / Pig &amp; Plough</strong><span>Café or pub-style backup options around Winterton/Cathkin Park.</span></div>
-        </div>
-      </div>
+    <section class="wide-panels">
+      <div class="notes-panel" id="links"><div class="panel-title-row"><h3 contenteditable="true">Helpful links <span class="edit-icon">✏️</span></h3><button class="mini edit-only" onclick="addLinkCard()">＋ Add link</button></div><div class="option-grid">
+        <div class="link-card"><strong contenteditable="true">Drakensberg Sun Resort</strong><span contenteditable="true">Resort information, facilities and contact details.</span><div class="link-url" contenteditable="true">https://www.southernsun.com/drakensberg-sun-resort</div><a class="open-link" href="https://www.southernsun.com/drakensberg-sun-resort" target="_blank" rel="noopener">Open link →</a><div class="card-actions edit-only"><button class="mini" onclick="refreshLink(this)">Update link</button><button class="mini" onclick="removeCard(this)">Remove</button></div></div>
+        <div class="link-card"><strong contenteditable="true">Google Maps</strong><span contenteditable="true">Use this for directions and sharing the destination.</span><div class="link-url" contenteditable="true">https://maps.google.com</div><a class="open-link" href="https://maps.google.com" target="_blank" rel="noopener">Open link →</a><div class="card-actions edit-only"><button class="mini" onclick="refreshLink(this)">Update link</button><button class="mini" onclick="removeCard(this)">Remove</button></div></div>
+      </div></div>
 
-      <div class="info-card">
-        <h3 contenteditable="true">Activities shortlist</h3>
-        <div class="option-grid">
-          <div class="option" contenteditable="true"><strong>Lake activities</strong><span>Canoeing, row boats, lake walk, bird watching and fishing.</span></div>
-          <div class="option" contenteditable="true"><strong>Sports</strong><span>Squash, tennis, swimming pools and bowling green.</span></div>
-          <div class="option" contenteditable="true"><strong>Adventure options</strong><span>Horse riding, mountain biking, lake cruise or extra hiking.</span></div>
-          <div class="option" contenteditable="true"><strong>Indoor / night options</strong><span>Games room, board games, card games, D&amp;D, video games and horror movies.</span></div>
-        </div>
-      </div>
-
-      <div class="info-card">
-        <h3 contenteditable="true">Hike options</h3>
-        <div class="option-grid">
-          <div class="option" contenteditable="true"><strong>Blue Grotto</strong><span>Recommended. Moderate, 2–3 hours, waterfall/natural pool destination.</span></div>
-          <div class="option" contenteditable="true"><strong>Fern Forest</strong><span>Easy to moderate, 1–1.5 hours, shaded indigenous forest and birdlife.</span></div>
-          <div class="option" contenteditable="true"><strong>Ellis Hike</strong><span>Moderate to challenging, 3–4 hours, stronger views and more elevation.</span></div>
-          <div class="option" contenteditable="true"><strong>Lake Walk</strong><span>Easy, 30–60 minutes, best if everyone wants something light.</span></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="notes-panel">
-      <h3 contenteditable="true">Group notes / packing / decisions</h3>
-      <div class="big-notes" contenteditable="true">Packing reminders: hiking shoes, warm jacket, rain jacket, swimming costume, snacks, drinks, braai supplies, power banks, flashlight, playing cards, board games and D&amp;D accessories. Final decisions: confirm Sunday dinner location, confirm hike difficulty everyone is comfortable with, confirm who brings braai items.</div>
+      <div class="notes-panel" id="notes"><h3 contenteditable="true">Group notes / packing / decisions <span class="edit-icon">✏️</span></h3><div class="big-notes" contenteditable="true">Packing reminders: hiking shoes, warm jacket, rain jacket, swimming costume, snacks, drinks, braai supplies, power banks, flashlight, playing cards, board games and D&amp;D accessories. Final decisions: confirm Sunday dinner location, confirm hike difficulty everyone is comfortable with, confirm who brings braai items.</div><div class="checklist">
+        <label class="check-item"><input type="checkbox" onchange="markDirty()"><span contenteditable="true">Charcoal and firelighters</span></label>
+        <label class="check-item"><input type="checkbox" onchange="markDirty()"><span contenteditable="true">Board games and cards</span></label>
+        <label class="check-item"><input type="checkbox" onchange="markDirty()"><span contenteditable="true">Hiking shoes and warm jackets</span></label>
+      </div><button class="mini edit-only" style="margin-top:10px" onclick="addChecklistItem()">＋ Add checklist item</button></div>
     </section>
   </main>
+</div>
 
-  <div class="toast" id="toast">Type set to Chill</div>
+<div class="toast" id="toast">Saved</div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <script>
-    // === SUPABASE SETTINGS ===
-    // Paste these 2 values from Supabase > Project Settings > API.
+<script>
   const SUPABASE_URL = "https://lpqsybkqxpvdpfesdhaw.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwcXN5YmtxeHB2ZHBmZXNkaGF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxNjk2MDAsImV4cCI6MjA5NTc0NTYwMH0.5tnq4LJU2hP6j5iUe5BR83C7f66EiAqXqIdghzFcmn4";
+  const TRIP_ID = "drakensberg-sun-2026";
+  const LOCAL_KEY = "drakensberg-sun-itinerary-v2-local";
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let isDirty = false;
 
+  function showToast(message) { const t = document.getElementById("toast"); t.textContent = message; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1800); }
+  function setStatus(message) { const s = document.getElementById("saveStatus"); if (s) s.textContent = message; }
+  function markDirty() { isDirty = true; setStatus("Unsaved changes"); saveLocal(); syncSelectAttributes(document); updateAllLinks(); }
+  function saveLocal() { const app = document.getElementById("appContent"); localStorage.setItem(LOCAL_KEY, app.outerHTML); }
 
-    // This is the single shared itinerary row in your database.
-    const TRIP_ID = "drakensberg-sun-2026";
+  function toggleEditMode() { document.body.classList.toggle("edit-mode"); showToast(document.body.classList.contains("edit-mode") ? "Edit mode on" : "Edit mode off"); }
+  function getValidType(type) { return ["stay","food","activity","hike","chill"].includes(type) ? type : "activity"; }
+  function syncSelectAttributes(root = document) { root.querySelectorAll("select").forEach(select => Array.from(select.options).forEach(opt => opt.selected ? opt.setAttribute("selected","selected") : opt.removeAttribute("selected"))); root.querySelectorAll('input[type="checkbox"]').forEach(box => box.checked ? box.setAttribute("checked","checked") : box.removeAttribute("checked")); }
+  function updateTileType(select) { const tile = select.closest(".tile"); if (!tile) return; tile.dataset.type = getValidType(select.value); syncSelectAttributes(tile); markDirty(); showToast("Type updated"); }
+  function updateStatus(select) { const row = select.closest(".status-row"); const badge = row?.querySelector(".badge"); if (badge) badge.textContent = select.value; syncSelectAttributes(row); markDirty(); }
 
-    const STORAGE_KEY = "drakensberg-sun-itinerary-html";
-    let isRestoringSharedVersion = false;
-    let saveTimer = null;
+  document.addEventListener("input", e => { if (e.target.matches('[contenteditable="true"], #bgUrl')) markDirty(); });
+  document.addEventListener("change", e => { if (e.target.matches("select, input")) markDirty(); });
+  document.addEventListener("click", e => { if (e.target.matches(".open-link")) updateAllLinks(); });
 
-    const supabaseClient =
-      SUPABASE_URL.includes("PASTE_") || SUPABASE_ANON_KEY.includes("PASTE_")
-        ? null
-        : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  function addBlankTile() {
+    const day = prompt("Add tile to which day? Saturday, Sunday, or Monday:", "Sunday"); if (!day) return;
+    const col = [...document.querySelectorAll(".day-column")].find(c => c.dataset.day.toLowerCase() === day.trim().toLowerCase());
+    if (!col) return showToast("Day not found");
+    const tile = document.createElement("div"); tile.className = "tile"; tile.dataset.type = "activity";
+    tile.innerHTML = `<button class="drag-handle edit-only" type="button" title="Drag to rearrange">⋮⋮</button><div class="tile-top"><div class="time" contenteditable="true">Time</div><select class="type-select" onchange="updateTileType(this)"><option value="stay">Stay</option><option value="food">Food</option><option value="activity" selected>Activity</option><option value="hike">Hike</option><option value="chill">Chill</option></select></div><div class="tile-title" contenteditable="true">New itinerary tile</div><div class="tile-notes" contenteditable="true">Add notes here.</div><div class="status-row"><span class="badge">Needs decision</span><select class="status-select" onchange="updateStatus(this)"><option>Finalised</option><option selected>Needs decision</option><option>Maybe</option><option>Backup</option></select></div><div class="tile-actions edit-only"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>`;
+    col.querySelector(".tile-list").appendChild(tile); markDirty(); showToast("Tile added");
+  }
+  function duplicateTile(btn) { const tile = btn.closest(".tile"); syncSelectAttributes(tile); tile.after(tile.cloneNode(true)); markDirty(); showToast("Tile duplicated"); }
+  function deleteTile(btn) { if(confirm("Remove this tile?")) { btn.closest(".tile")?.remove(); markDirty(); showToast("Tile removed"); } }
 
-    function showToast(message) {
-      const toast = document.getElementById("toast");
-      if (!toast) return;
-      toast.textContent = message;
-      toast.classList.add("show");
-      setTimeout(() => toast.classList.remove("show"), 1800);
-    }
+  function addOptionCard(btn, type) {
+    const grid = btn.closest(".panel-card").querySelector(".option-grid");
+    const labels = {meal:"New meal location", activity:"New activity option", hike:"New hike option"};
+    const card = document.createElement("div"); card.className = "option";
+    card.innerHTML = `<strong contenteditable="true">${labels[type] || "New option"}</strong><span contenteditable="true">Add a short description here.</span><div class="card-actions edit-only"><button class="mini" onclick="duplicateOption(this)">Duplicate</button><button class="mini" onclick="removeCard(this)">Remove</button></div>`;
+    grid.appendChild(card); markDirty(); showToast("Card added");
+  }
+  function duplicateOption(btn) { const card = btn.closest(".option, .link-card"); card.after(card.cloneNode(true)); markDirty(); showToast("Card duplicated"); }
+  function removeCard(btn) { if(confirm("Remove this card?")) { btn.closest(".option, .link-card, .decision-item, .check-item")?.remove(); markDirty(); showToast("Card removed"); } }
+  function addLinkCard() { const grid = document.querySelector("#links .option-grid"); const card = document.createElement("div"); card.className = "link-card"; card.innerHTML = `<strong contenteditable="true">New helpful link</strong><span contenteditable="true">Describe what this link is for.</span><div class="link-url" contenteditable="true">https://example.com</div><a class="open-link" href="https://example.com" target="_blank" rel="noopener">Open link →</a><div class="card-actions edit-only"><button class="mini" onclick="refreshLink(this)">Update link</button><button class="mini" onclick="removeCard(this)">Remove</button></div>`; grid.appendChild(card); markDirty(); showToast("Link added"); }
+  function refreshLink(btn) { const card = btn.closest(".link-card"); const url = cleanUrl(card.querySelector(".link-url")?.textContent.trim()); const link = card.querySelector(".open-link"); if (link) link.href = url; markDirty(); showToast("Link updated"); }
+  function cleanUrl(url) { if (!url) return "#"; return /^https?:\/\//i.test(url) ? url : "https://" + url; }
+  function updateAllLinks() { document.querySelectorAll(".link-card").forEach(card => { const url = cleanUrl(card.querySelector(".link-url")?.textContent.trim()); const link = card.querySelector(".open-link"); if(link) link.href = url; }); }
+  function addChecklistItem() { const list = document.querySelector(".checklist"); const item = document.createElement("label"); item.className = "check-item"; item.innerHTML = `<input type="checkbox" onchange="markDirty()"><span contenteditable="true">New checklist item</span><button class="mini edit-only" type="button" onclick="removeCard(this)">Remove</button>`; list.appendChild(item); markDirty(); }
+  function updateBackground(url) { document.documentElement.style.setProperty("--hero-image", `url("${url}")`); markDirty(); }
+  function applyBackgroundFromInput() { const bg = document.getElementById("bgUrl"); if (bg?.value) document.documentElement.style.setProperty("--hero-image", `url("${bg.value}")`); }
 
-    function cleanClone(root) {
-      syncTypeSelectAttributes(root);
-      root.querySelectorAll(".tile.dragging").forEach(el => el.classList.remove("dragging"));
-      root.querySelectorAll(".tile-placeholder").forEach(el => el.remove());
-      root.querySelectorAll(".tile-list.drag-over").forEach(el => el.classList.remove("drag-over"));
-      root.querySelectorAll(".toast").forEach(el => el.classList.remove("show"));
+  function getCleanAppHtml() { syncSelectAttributes(document); updateAllLinks(); const app = document.getElementById("appContent").cloneNode(true); app.querySelectorAll(".tile.dragging").forEach(el => el.classList.remove("dragging")); app.querySelectorAll(".tile-placeholder").forEach(el => el.remove()); app.querySelectorAll(".tile-list.drag-over").forEach(el => el.classList.remove("drag-over")); return app.outerHTML; }
+  async function saveShared() { const html = getCleanAppHtml(); const { error } = await sb.from("itineraries").upsert({ id: TRIP_ID, html, updated_at: new Date().toISOString() }); if(error) { console.error(error); showToast("Supabase save failed"); setStatus("Save failed"); return; } isDirty = false; setStatus("Saved " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})); showToast("Shared version saved"); }
+  async function loadShared(force = false) { if (isDirty && !force && !confirm("You have unsaved local changes. Load shared version anyway?")) return; const { data, error } = await sb.from("itineraries").select("html, updated_at").eq("id", TRIP_ID).maybeSingle(); if(error) { console.error(error); showToast("Could not load shared version"); return; } if(!data?.html) { setStatus("No shared save yet"); return; } if(!data.html.includes('data-app-version="2"')) { setStatus("Old shared version ignored"); showToast("Old shared save found. Click Save Shared once to upgrade it."); return; } const temp = document.createElement("div"); temp.innerHTML = data.html.trim(); const newApp = temp.querySelector("#appContent"); if(!newApp) return; document.getElementById("appContent").replaceWith(newApp); isDirty = false; initAfterDomChange(); setStatus("Loaded " + new Date(data.updated_at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})); showToast("Shared version loaded"); }
+  function exportHtml() { const clone = document.documentElement.cloneNode(true); const html = "<!DOCTYPE html>\n" + clone.outerHTML; const blob = new Blob([html], {type:"text/html"}); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "drakensberg-sun-itinerary-enhanced.html"; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); showToast("HTML exported"); }
 
-      // Do not save JavaScript binding markers into Supabase/HTML.
-      // Event listeners do not survive a page reload, so saved markers can stop drag/edit from rebinding.
-      root.querySelectorAll("[data-autosave-bound], [data-drag-bound]").forEach(el => {
-        el.removeAttribute("data-autosave-bound");
-        el.removeAttribute("data-drag-bound");
-      });
+  let dragging = null;
+  document.addEventListener("pointerdown", e => { const handle = e.target.closest(".drag-handle"); if(!handle || !document.body.classList.contains("edit-mode")) return; const tile = handle.closest(".tile"); if(tile) startDrag(e, tile); });
+  function startDrag(event, tile) { event.preventDefault(); const rect = tile.getBoundingClientRect(); const placeholder = document.createElement("div"); placeholder.className = "tile-placeholder"; placeholder.style.height = rect.height + "px"; tile.parentElement.insertBefore(placeholder, tile.nextSibling); document.body.appendChild(tile); tile.classList.add("dragging"); Object.assign(tile.style, {position:"fixed", left:rect.left+"px", top:rect.top+"px", width:rect.width+"px", margin:"0"}); dragging = {tile, placeholder, offsetX:event.clientX-rect.left, offsetY:event.clientY-rect.top}; document.addEventListener("pointermove", moveDrag, {passive:false}); document.addEventListener("pointerup", endDrag); document.addEventListener("pointercancel", endDrag); }
+  function moveDrag(e) { if(!dragging) return; e.preventDefault(); const {tile, placeholder, offsetX, offsetY} = dragging; tile.style.left = (e.clientX-offsetX)+"px"; tile.style.top = (e.clientY-offsetY)+"px"; const list = getTargetList(e.clientX,e.clientY) || placeholder.parentElement; document.querySelectorAll(".tile-list.drag-over").forEach(l=>l.classList.remove("drag-over")); list.classList.add("drag-over"); const before = getInsertBefore(list,e.clientY); before ? list.insertBefore(placeholder,before) : list.appendChild(placeholder); }
+  function endDrag() { if(!dragging) return; const {tile, placeholder} = dragging; placeholder.parentElement.insertBefore(tile, placeholder); placeholder.remove(); tile.classList.remove("dragging"); tile.removeAttribute("style"); document.querySelectorAll(".tile-list.drag-over").forEach(l=>l.classList.remove("drag-over")); document.removeEventListener("pointermove", moveDrag); document.removeEventListener("pointerup", endDrag); document.removeEventListener("pointercancel", endDrag); dragging = null; markDirty(); showToast("Tile moved"); }
+  function getTargetList(x,y) { const lists = [...document.querySelectorAll(".tile-list")]; return lists.find(list => { const r = list.getBoundingClientRect(); return x>=r.left && x<=r.right && y>=r.top && y<=r.bottom; }) || lists.reduce((best, list) => { const r = list.getBoundingClientRect(); const dx = x<r.left ? r.left-x : x>r.right ? x-r.right : 0; const dy = y<r.top ? r.top-y : y>r.bottom ? y-r.bottom : 0; const d = Math.hypot(dx,dy); return !best || d<best.d ? {list,d} : best; }, null)?.list; }
+  function getInsertBefore(container, y) { return [...container.querySelectorAll(".tile:not(.dragging)")].reduce((closest, child) => { const box = child.getBoundingClientRect(); const offset = y - box.top - box.height/2; if(offset < 0 && offset > closest.offset) return {offset, element: child}; return closest; }, {offset: Number.NEGATIVE_INFINITY}).element; }
 
-      return root;
-    }
-
-    function getCurrentHtml() {
-      const clone = document.documentElement.cloneNode(true);
-      cleanClone(clone);
-      return "<!DOCTYPE html>\n" + clone.outerHTML;
-    }
-
-    function bindAutoSave() {
-      document.querySelectorAll('[contenteditable="true"]').forEach(el => {
-        // Use a JS-only property, not a data attribute, because data attributes get saved into the HTML.
-        if (el.__autosaveBound) return;
-        el.__autosaveBound = true;
-        el.removeAttribute("data-autosave-bound");
-        el.addEventListener("input", () => {
-          saveCurrentState();
-        });
-      });
-    }
-
-    function saveCurrentState() {
-      if (isRestoringSharedVersion) return;
-
-      const html = getCurrentHtml();
-      localStorage.setItem(STORAGE_KEY, html);
-
-      // Debounce remote saving so it does not save on every single keystroke instantly.
-      clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => {
-        saveSharedHtml(html);
-      }, 900);
-    }
-
-    async function saveSharedHtml(html) {
-      if (!supabaseClient) {
-        showToast("Local save only: add Supabase keys");
-        return;
-      }
-
-      const { error } = await supabaseClient
-        .from("itineraries")
-        .upsert({
-          id: TRIP_ID,
-          html: html,
-          updated_at: new Date().toISOString()
-        });
-
-      if (error) {
-        console.error(error);
-        showToast("Shared save failed");
-        return;
-      }
-
-      showToast("Shared version saved");
-    }
-
-    async function loadSharedHtml() {
-      if (!supabaseClient) {
-        showToast("Add Supabase keys to enable shared saving");
-        return;
-      }
-
-      const { data, error } = await supabaseClient
-        .from("itineraries")
-        .select("html")
-        .eq("id", TRIP_ID)
-        .maybeSingle();
-
-      if (error) {
-        console.error(error);
-        showToast("Could not load shared version");
-        return;
-      }
-
-      if (!data || !data.html) {
-        // First time: save the current page as the shared starting point.
-        await saveSharedHtml(getCurrentHtml());
-        return;
-      }
-
-      isRestoringSharedVersion = true;
-
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(data.html, "text/html");
-
-      // Replace the visible page with the saved shared version.
-      document.body.innerHTML = doc.body.innerHTML;
-
-      // Reconnect all behaviours after replacing the page content.
-      initPageBehaviour();
-
-      isRestoringSharedVersion = false;
-      localStorage.setItem(STORAGE_KEY, data.html);
-      showToast("Shared version loaded");
-    }
-
-    function getValidType(type) {
-      return ["stay", "food", "activity", "hike", "chill"].includes(type) ? type : "activity";
-    }
-
-    function typeSelectHtml(selectedType = "activity") {
-      const selected = getValidType(selectedType);
-      const types = [
-        ["stay", "Stay"],
-        ["food", "Food"],
-        ["activity", "Activity"],
-        ["hike", "Hike"],
-        ["chill", "Chill"]
-      ];
-
-      return `<select class="type-select" aria-label="Activity type" onchange="updateTileType(this)">${types.map(([value, label]) => `<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`).join("")}</select>`;
-    }
-
-    function syncTypeSelectAttributes(root = document) {
-      root.querySelectorAll(".type-select").forEach(select => {
-        Array.from(select.options).forEach(option => {
-          if (option.value === select.value) {
-            option.setAttribute("selected", "selected");
-          } else {
-            option.removeAttribute("selected");
-          }
-        });
-      });
-    }
-
-    function updateTileType(select) {
-      const tile = select.closest(".tile");
-      if (!tile) return;
-      tile.dataset.type = getValidType(select.value);
-      syncTypeSelectAttributes(tile);
-      saveCurrentState();
-      showToast(`Type set to ${select.options[select.selectedIndex].text}`);
-    }
-
-    function initTypeDropdowns() {
-      document.querySelectorAll(".tile").forEach(tile => {
-        const existingSelect = tile.querySelector(".type-select");
-        const oldType = tile.querySelector(".type");
-        let selectedType = getValidType(tile.dataset.type || existingSelect?.value || oldType?.textContent.trim().toLowerCase());
-        tile.dataset.type = selectedType;
-
-        if (existingSelect) {
-          existingSelect.value = selectedType;
-          existingSelect.setAttribute("onchange", "updateTileType(this)");
-          syncTypeSelectAttributes(tile);
-          return;
-        }
-
-        if (oldType) {
-          oldType.outerHTML = typeSelectHtml(selectedType);
-        }
-      });
-    }
-
-    function initDragAndDrop() {
-      document.querySelectorAll(".tile").forEach(tile => {
-        let handle = tile.querySelector(".drag-handle");
-
-        if (!handle) {
-          handle = document.createElement("button");
-          handle.className = "drag-handle";
-          handle.type = "button";
-          handle.title = "Drag to rearrange";
-          handle.setAttribute("aria-label", "Drag to rearrange tile");
-          handle.innerHTML = "⋮⋮";
-          tile.prepend(handle);
-        }
-
-        // Use a JS-only property, not data-drag-bound. Saved data attributes caused handles
-        // to look bound after reloading from Supabase, even though their event listeners were gone.
-        if (handle.__dragBound) return;
-        handle.__dragBound = true;
-        handle.removeAttribute("data-drag-bound");
-        handle.addEventListener("pointerdown", event => startTileDrag(event, tile));
-      });
-    }
-
-    function startTileDrag(event, tile) {
-      event.preventDefault();
-
-      const startRect = tile.getBoundingClientRect();
-      const placeholder = document.createElement("div");
-      placeholder.className = "tile-placeholder";
-      placeholder.style.height = `${startRect.height}px`;
-
-      const originalParent = tile.parentElement;
-      originalParent.insertBefore(placeholder, tile.nextSibling);
-
-      document.body.appendChild(tile);
-      tile.classList.add("dragging");
-      tile.style.position = "fixed";
-      tile.style.left = `${startRect.left}px`;
-      tile.style.top = `${startRect.top}px`;
-      tile.style.width = `${startRect.width}px`;
-      tile.style.margin = "0";
-
-      const offsetX = event.clientX - startRect.left;
-      const offsetY = event.clientY - startRect.top;
-      tile.setPointerCapture?.(event.pointerId);
-
-      function moveTile(moveEvent) {
-        moveEvent.preventDefault();
-        tile.style.left = `${moveEvent.clientX - offsetX}px`;
-        tile.style.top = `${moveEvent.clientY - offsetY}px`;
-
-        const targetList = getTargetTileList(moveEvent.clientX, moveEvent.clientY) || placeholder.parentElement;
-        document.querySelectorAll(".tile-list.drag-over").forEach(list => list.classList.remove("drag-over"));
-        targetList.classList.add("drag-over");
-
-        const afterElement = getInsertBeforeElement(targetList, moveEvent.clientY);
-        if (afterElement) {
-          targetList.insertBefore(placeholder, afterElement);
-        } else {
-          targetList.appendChild(placeholder);
-        }
-      }
-
-      function endTileDrag(upEvent) {
-        tile.releasePointerCapture?.(upEvent.pointerId);
-        document.removeEventListener("pointermove", moveTile);
-        document.removeEventListener("pointerup", endTileDrag);
-        document.removeEventListener("pointercancel", endTileDrag);
-
-        placeholder.parentElement.insertBefore(tile, placeholder);
-        placeholder.remove();
-
-        tile.classList.remove("dragging");
-        tile.removeAttribute("style");
-        document.querySelectorAll(".tile-list.drag-over").forEach(list => list.classList.remove("drag-over"));
-        saveCurrentState();
-        showToast("Tile moved");
-      }
-
-      document.addEventListener("pointermove", moveTile, { passive: false });
-      document.addEventListener("pointerup", endTileDrag);
-      document.addEventListener("pointercancel", endTileDrag);
-    }
-
-    function getTargetTileList(x, y) {
-      const lists = Array.from(document.querySelectorAll(".tile-list"));
-      return lists.find(list => {
-        const rect = list.getBoundingClientRect();
-        return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
-      }) || lists.reduce((closest, list) => {
-        const rect = list.getBoundingClientRect();
-        const dx = x < rect.left ? rect.left - x : x > rect.right ? x - rect.right : 0;
-        const dy = y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0;
-        const distance = Math.hypot(dx, dy);
-        return !closest || distance < closest.distance ? { list, distance } : closest;
-      }, null)?.list;
-    }
-
-    function getInsertBeforeElement(container, y) {
-      const draggableElements = [...container.querySelectorAll(".tile:not(.dragging)")];
-      return draggableElements.reduce((closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = y - box.top - box.height / 2;
-        if (offset < 0 && offset > closest.offset) {
-          return { offset, element: child };
-        }
-        return closest;
-      }, { offset: Number.NEGATIVE_INFINITY }).element;
-    }
-
-    function duplicateTile(button) {
-      const tile = button.closest(".tile");
-      syncTypeSelectAttributes(tile);
-      const clone = tile.cloneNode(true);
-      clone.querySelectorAll("[data-autosave-bound], [data-drag-bound]").forEach(el => {
-        delete el.dataset.autosaveBound;
-        delete el.dataset.dragBound;
-      });
-      tile.after(clone);
-      initPageBehaviour();
-      saveCurrentState();
-      showToast("Tile duplicated");
-    }
-
-    function deleteTile(button) {
-      const tile = button.closest(".tile");
-      tile.remove();
-      saveCurrentState();
-      showToast("Tile removed");
-    }
-
-    function addBlankTile() {
-      const day = prompt("Add tile to which day? Type Saturday, Sunday, or Monday:", "Sunday");
-      if (!day) return;
-      const column = Array.from(document.querySelectorAll(".day-column")).find(col => col.dataset.day.toLowerCase() === day.trim().toLowerCase());
-      if (!column) {
-        showToast("Day not found");
-        return;
-      }
-      const tile = document.createElement("div");
-      tile.className = "tile";
-      tile.dataset.type = "activity";
-      tile.innerHTML = `
-        <div class="tile-top"><div class="time" contenteditable="true">Time</div><div class="type" contenteditable="true">Activity</div></div>
-        <div class="tile-title" contenteditable="true">New itinerary tile</div>
-        <div class="tile-notes" contenteditable="true">Add notes here.</div>
-        <div class="tile-actions"><button class="mini" onclick="duplicateTile(this)">Duplicate</button><button class="mini" onclick="deleteTile(this)">Remove</button></div>
-      `;
-      column.querySelector(".tile-list").appendChild(tile);
-      initPageBehaviour();
-      saveCurrentState();
-      showToast("Tile added");
-    }
-
-    function saveHtml() {
-      saveCurrentState();
-
-      const html = getCurrentHtml();
-      const blob = new Blob([html], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "drakensberg-sun-itinerary.html";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast("HTML downloaded");
-    }
-
-    async function manualSharedSave() {
-      await saveSharedHtml(getCurrentHtml());
-    }
-
-    function resetStarterPlan() {
-      if (!confirm("This clears only this browser's local backup. The shared Supabase version will reload next time. Continue?")) return;
-      localStorage.removeItem(STORAGE_KEY);
-      location.reload();
-    }
-
-    function initPageBehaviour() {
-      bindAutoSave();
-      initTypeDropdowns();
-      initDragAndDrop();
-    }
-
-    initPageBehaviour();
-    window.addEventListener("beforeunload", () => {
-      if (!isRestoringSharedVersion) {
-        localStorage.setItem(STORAGE_KEY, getCurrentHtml());
-      }
-    });
-
-    // Load the online shared version after the script is ready.
-    loadSharedHtml();
-  </script>
-
-
-</body></html>
+  function initAfterDomChange() { updateAllLinks(); applyBackgroundFromInput(); document.body.classList.remove("edit-mode"); }
+  window.addEventListener("beforeunload", () => { saveLocal(); });
+  initAfterDomChange(); loadShared(false);
+</script>
+</body>
+</html>
